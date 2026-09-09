@@ -17,6 +17,8 @@ pm2-zabbix operates in two ways: as a script called by the Agent used for item d
 
 ### Prerequisites
 
+This module requires Node.js 18 or newer and supports PM2 5.x and 7.x. It attaches to whichever PM2 daemon is already running in `$PM2_HOME`, and a 5.x and 7.x client and daemon interoperate in either direction, so pm2-zabbix does not have to be upgraded in lockstep with the applications it monitors.
+
 This module relies on having the `zabbix_sender` binary installed, and on `/etc/zabbix/zabbix_agentd.conf` being present on the system. Both typically come with a `zabbix-agent` package for your Linux distribution (some repositories may split this into two separate packages - `zabbix-agent` and `zabbix-sender`). It has been tested with Zabbix 3.0.
 
 ### Installing
@@ -81,6 +83,29 @@ For the monitoring server to know what processes exist on the PM2 host, it needs
 A template needs to be installed (and assigned to a host) that tells Zabbix of the possible items to monitor, and establishes a default set of triggers and discovery rules for dynamically finding processes.
 
 The default template file can be found in `install/zabbix-server/` - upload it via the Zabbix management  web UI and assign it to the hosts that you intend to be monitoring PM2 on. Appropriate keys will be created automatically.
+
+## Development
+
+### Running the tests
+
+```
+$ npm install
+$ npm test
+```
+
+`npm test` runs an end-to-end smoke test that starts a throwaway PM2 daemon in its own
+`$PM2_HOME` (under your system temp directory), runs a dummy app under it, and checks the
+whole data path against a stub sender: LLD discovery, the periodic process list, the PM2
+daemon's own status, live bus events, and the "PM2 is down" path.
+
+It does not touch your real PM2 instance, and needs neither a Zabbix server nor the
+`zabbix_sender` binary. Run it against a specific PM2 version to check compatibility:
+
+```
+$ npm install pm2@5 --no-save && npm test
+$ npm install pm2@7 --no-save && npm test
+$ npm ci
+```
 
 ## Logging
 
