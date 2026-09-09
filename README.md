@@ -17,7 +17,7 @@ pm2-zabbix operates in two ways: as a script called by the Agent used for item d
 
 ### Prerequisites
 
-This module supports PM2 5.x and 7.x. It attaches to whichever PM2 daemon is already running in `$PM2_HOME`, and a 5.x and 7.x client and daemon interoperate in either direction, so pm2-zabbix does not have to be upgraded in lockstep with the applications it monitors.
+This module requires Node.js 18 or newer and supports PM2 5.x and 7.x. It attaches to whichever PM2 daemon is already running in `$PM2_HOME`, and a 5.x and 7.x client and daemon interoperate in either direction, so pm2-zabbix does not have to be upgraded in lockstep with the applications it monitors.
 
 This module relies on having the `zabbix_sender` binary installed, and on `/etc/zabbix/zabbix_agentd.conf` being present on the system. Both typically come with a `zabbix-agent` package for your Linux distribution (some repositories may split this into two separate packages - `zabbix-agent` and `zabbix-sender`). It has been tested with Zabbix 3.0.
 
