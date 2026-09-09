@@ -14,7 +14,7 @@
     "url": "https://github.com/greatcare/pm2-zabbix.git"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node test/smoke.js",
     "jsdoc": "scripts/jsdoc.sh"
   },
   "bin": {
@@ -25,8 +25,8 @@
   "dependencies": {
     "bunyan": "^1.8.10",
     "minimist": "^1.2.0",
-    "pidusage": "^1.0.1",
-    "pm2": "^5.1.2",
+    "pidusage": "^4.0.1",
+    "pm2": "^5 || ^7",
     "when": "^3.7.7",
     "zabbix-sender": "git+https://github.com/greatcare/node-zabbix-sender.git#v0.3.0"
   }
