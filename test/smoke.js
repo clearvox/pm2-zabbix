@@ -18,7 +18,10 @@ var fs = require('fs');
 // PM2_HOME must be set before anything requires pm2/paths, which reads it at load time.
 // Keep the directory short: PM2's IPC sockets live inside it and AF_UNIX paths are
 // capped at ~104 characters on macOS / ~108 on Linux.
-var PM2_HOME = path.join(os.tmpdir(), 'pm2zbx-smoke');
+// The directory is unique per run: a fixed one lets a daemon left over from a previous
+// run (or a concurrent one) collide with this test, which shows up as a spurious
+// "PM2 is being killed, stopping restart procedure" failure.
+var PM2_HOME = path.join(os.tmpdir(), 'pm2zbx-' + process.pid + '-' + Date.now().toString(36));
 process.env.PM2_HOME = PM2_HOME;
 
 var pm2 = require('pm2');
@@ -83,10 +86,36 @@ function setUp() {
 	});
 }
 
+var daemonKilled = false;
+
+/**
+ * Kill the throwaway daemon, at most once.
+ * Calling pm2.killDaemon() when no daemon is running can hang (it may try to talk to
+ * a socket nobody is listening on), so guard it with a flag and a timeout - teardown
+ * must never be able to wedge the suite.
+ */
+function killDaemon() {
+	if (daemonKilled) {
+		return Promise.resolve();
+	}
+	daemonKilled = true;
+	return Promise.race([
+		pm2Kill().catch(function() {
+			// Best effort - the daemon may already be gone.
+			return null;
+		}),
+		delay(15000)
+	]);
+}
+
 function tearDown() {
-	return pm2Kill().catch(function() {
-		// Best effort - the daemon may already be gone.
-		return null;
+	return killDaemon().then(function() {
+		try {
+			fs.rmSync(PM2_HOME, { recursive: true, force: true });
+		}
+		catch (error) {
+			// Leaving a temp directory behind must never fail the run.
+		}
 	});
 }
 
@@ -156,7 +185,7 @@ function run() {
 		console.log('\n# PM2 offline path');
 		return tracker.stop().catch(function() {
 			return null;
-		}).then(tearDown).then(function() {
+		}).then(killDaemon).then(function() {
 			return delay(1000);
 		}).then(function() {
 			return tracker.getPM2State();
@@ -165,6 +194,26 @@ function run() {
 		assert(state.status === 'offline', 'a dead PM2 daemon reports "offline" rather than throwing (got "' + state.status + '")');
 		assert(state.pid === 0, 'a dead PM2 daemon reports PID 0');
 		assert(state.resources.cpu === 0 && state.resources.memory === 0, 'a dead PM2 daemon reports zero resource usage');
+	});
+}
+
+/**
+ * Print the closing summary and exit with the right status.
+ * process.exit() discards whatever is still buffered when stdout is a pipe (a file
+ * redirect or a CI log), so exit from the write callback, which fires once the data
+ * has actually been flushed.
+ */
+function finish() {
+	var summary = '\n' + (checks - failures.length) + '/' + checks + ' checks passed\n';
+	if (failures.length) {
+		summary += 'failed:\n' + failures.map(function(failure) {
+			return '  - ' + failure;
+		}).join('\n') + '\n';
+	}
+	var code = failures.length ? 1 : 0;
+	process.exitCode = code;
+	process.stdout.write(summary, function() {
+		process.exit(code);
 	});
 }
 
@@ -177,13 +226,4 @@ setUp()
 		console.log('\n  FAIL - unexpected error:\n' + ((error && error.stack) || error));
 		return tearDown();
 	})
-	.then(function() {
-		console.log('\n' + (checks - failures.length) + '/' + checks + ' checks passed');
-		if (failures.length) {
-			console.log('failed:');
-			failures.forEach(function(failure) {
-				console.log('  - ' + failure);
-			});
-		}
-		process.exit(failures.length ? 1 : 0);
-	});
+	.then(finish);
